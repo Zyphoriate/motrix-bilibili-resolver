@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "id": "community.bilibili-resolver",
   "name": "%name%",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "%description%",
   "author": "Community",
   "license": "MIT",
@@ -134,7 +134,11 @@
             "defaultQuality": {
               "type": "string",
               "enum": [
-                "1080p"
+                "2160p",
+                "1440p",
+                "1080p",
+                "720p",
+                "480p"
               ]
             }
           }
@@ -268,15 +272,24 @@
           "preferredQuality": {
             "type": "string",
             "enum": [
+              "highest",
               "2160p",
               "1440p",
               "1080p",
               "720p",
               "480p"
             ],
-            "default": "720p",
+            "default": "highest",
             "title": "%settings.preferredQuality.title%",
-            "description": "%settings.preferredQuality.desc%"
+            "description": "%settings.preferredQuality.desc%",
+            "enumLabels": {
+              "highest": "%settings.quality.highest%",
+              "2160p": "4K (2160P)",
+              "1440p": "2K (1440P)",
+              "1080p": "1080P",
+              "720p": "720P",
+              "480p": "480P"
+            }
           },
           "cookie": {
             "type": "string",
@@ -285,6 +298,12 @@
             "maxLength": 4096,
             "title": "%settings.cookie.title%",
             "description": "%settings.cookie.desc%"
+          },
+          "showSinglePartDialog": {
+            "type": "boolean",
+            "default": false,
+            "title": "%settings.showSinglePartDialog.title%",
+            "description": "%settings.showSinglePartDialog.desc%"
           }
         },
         "additionalProperties": false

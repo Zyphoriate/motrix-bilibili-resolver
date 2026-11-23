@@ -511,7 +511,7 @@ export async function inspectBilibili(
     title: (info.title.trim() || info.bvid || `av${info.aid}`).slice(0, 512),
     entries,
     qualities: ['2160p', '1440p', '1080p', '720p', '480p'],
-    defaultQuality: '1080p',
+    defaultQuality: deps.quality,
   }
 }
 

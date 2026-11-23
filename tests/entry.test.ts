@@ -112,7 +112,7 @@ describe('plugin entry point (mocked host)', () => {
       entries: Array<{ id: string; title: string; url: string; partNumber: number; durationSeconds: number }>
       defaultQuality: string
     }
-    expect(result.defaultQuality).toBe('1080p')
+    expect(result.defaultQuality).toBe('720p')
     expect(result.entries.map((entry) => entry.id)).toEqual(['111', '222'])
     expect(result.entries[1]).toMatchObject({ partNumber: 2, durationSeconds: 113 })
     expect(result.entries[1]!.title).toContain('P2')
@@ -123,6 +123,96 @@ describe('plugin entry point (mocked host)', () => {
     expect(selected).toMatchObject({ kind: 'mux', video: { url: 'https://cdn.example/v64.m4s' } })
     expect(selected.title).toContain('P2')
     expect(requests.some((url) => param(url, 'cid') === '222' && param(url, 'qn') === '64')).toBe(true)
+  })
+
+  it.each([
+    ['highest', '2160p', '120', 'v120.m4s'],
+    [undefined, '2160p', '120', 'v120.m4s'],
+    ['invalid-old-value', '2160p', '120', 'v120.m4s'],
+    ['2160p', '2160p', '120', 'v120.m4s'],
+    ['1440p', '1440p', '120', 'v80-avc.m4s'],
+    ['1080p', '1080p', '80', 'v80-avc.m4s'],
+    ['720p', '720p', '64', 'v64.m4s'],
+    ['480p', '480p', '32', 'v32.m4s'],
+  ])('uses preference %s through inspection, resolution and mock task creation', async (preference, expectedQuality, qn, videoFile) => {
+    hostState.config.preferredQuality = preference
+    const requests: string[] = []
+    fakeHostRequest((url) => {
+      requests.push(url)
+      if (url.includes('/x/web-interface/view')) return VIEW_PAYLOAD
+      if (param(url, 'fnval') === '4048') return {
+        ...DASH_PAYLOAD,
+        data: { ...DASH_PAYLOAD.data, dash: {
+          ...DASH_PAYLOAD.data.dash,
+          video: [
+            ...DASH_PAYLOAD.data.dash.video,
+            { id: 120, width: 3840, height: 2160, codecid: 12, baseUrl: 'https://cdn.example/v120.m4s' },
+            { id: 32, width: 854, height: 480, codecid: 7, baseUrl: 'https://cdn.example/v32.m4s' },
+          ],
+        } },
+      }
+      throw new Error(`unexpected request: ${url}`)
+    })
+    const inspect = hostState.commands.get('community.bilibili-resolver.inspectMedia')!
+    const preview = await inspect({ url: 'https://www.bilibili.com/video/BV1GJ411x7h7/' }) as {
+      entries: Array<{ id: string; url: string }>; defaultQuality: string; qualities: string[]
+    }
+    expect(preview.defaultQuality).toBe(expectedQuality)
+    expect(preview.qualities).toContain(preview.defaultQuality)
+    expect(preview.qualities).not.toContain('highest')
+    expect(requests).toHaveLength(1)
+    const resolve = hostState.commands.get('community.bilibili-resolver.resolve')!
+    // Model the host's visible task seam: the selected P uses the preview's
+    // concrete quality, and its downloaded streams become the mux task inputs.
+    const tasks: Array<{ source: string; video: string; audio: string; output: string }> = []
+    const selected = preview.entries[1]!
+    const resolution = await resolve({ url: selected.url, quality: preview.defaultQuality }) as {
+      kind: string; video: { url: string }; audio: { url: string }; title: string
+    }
+    expect(resolution.kind).toBe('mux')
+    tasks.push({ source: selected.url, video: resolution.video.url, audio: resolution.audio.url, output: `${resolution.title}.mp4` })
+    expect(tasks).toEqual([{
+      source: 'https://www.bilibili.com/video/BV1GJ411x7h7/?p=2',
+      video: `https://cdn.example/${videoFile}`,
+      audio: 'https://cdn.example/a192.m4s', output: '测试视频 - P2 第二集.mp4',
+    }])
+    expect(requests.some((url) => param(url, 'cid') === selected.id && param(url, 'qn') === qn)).toBe(true)
+    expect(requests.every((url) => !url.includes('highest'))).toBe(true)
+  })
+
+  it.each(['highest', undefined])('maps %s to 4K before resolving and falls back to available DASH', async (preference) => {
+    hostState.config.preferredQuality = preference
+    let requestedQn: string | null = null
+    fakeHostRequest((url) => {
+      if (url.includes('/x/web-interface/view')) return VIEW_PAYLOAD
+      requestedQn = param(url, 'qn')
+      return DASH_PAYLOAD
+    })
+    const resolve = hostState.commands.get('community.bilibili-resolver.resolve')!
+    const result = await resolve({ url: 'https://www.bilibili.com/video/BV1GJ411x7h7/?p=2' })
+    expect(requestedQn).toBe('120')
+    expect(result).toMatchObject({ kind: 'mux', video: { url: 'https://cdn.example/v80-avc.m4s' }, title: '测试视频 - P2 第二集' })
+  })
+
+  it('keeps highest out of the strict public resolve protocol', async () => {
+    hostState.request = async () => { throw new Error('must not request') }
+    const resolve = hostState.commands.get('community.bilibili-resolver.resolve')!
+    await expect(resolve({ url: 'https://www.bilibili.com/video/BV1GJ411x7h7/', quality: 'highest' })).rejects.toThrow('unsupported quality')
+  })
+
+  it('starts the default progressive hook at 4K but stages the available MP4 task', async () => {
+    hostState.config.preferredQuality = undefined
+    const qns: Array<string | null> = []
+    fakeHostRequest((url) => {
+      if (url.includes('/x/web-interface/view')) return VIEW_PAYLOAD
+      qns.push(param(url, 'qn'))
+      return directPlayPayload()
+    })
+    const { ctx, patches } = makeContext('https://www.bilibili.com/video/BV1GJ411x7h7/?p=2')
+    await hostState.beforeCreate!(ctx)
+    expect(qns[0]).toBe('120')
+    expect(patches[0]?.uris).toEqual(['https://cdn.example/v.mp4', 'https://cdn2.example/v.mp4'])
+    expect(ctx.metadata.get('filename')).toBe('测试视频 - P2 第二集.mp4')
   })
 
   it('rejects malformed inspection arguments before making requests', async () => {

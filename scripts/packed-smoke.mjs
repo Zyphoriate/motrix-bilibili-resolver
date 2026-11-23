@@ -3,6 +3,8 @@
 // renamed registrations that unit tests against src/ cannot see.
 
 import { build } from 'esbuild'
+import { execFileSync } from 'node:child_process'
+import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -24,7 +26,14 @@ await build({
   logLevel: 'warning',
 })
 
-const bundle = await readFile(path.join(root, 'dist', 'plugin.js'), 'utf8')
+const manifest = JSON.parse(await readFile(path.join(root, 'motrix-plugin.json'), 'utf8'))
+const archive = path.join(root, 'dist', `${manifest.id}-${manifest.version}.moext`)
+const unpack = (entry) => execFileSync('unzip', ['-p', archive, entry], { encoding: 'utf8' })
+assert.deepEqual(JSON.parse(unpack('motrix-plugin.json')), manifest)
+for (const locale of ['en-US', 'zh-CN']) {
+  assert.deepEqual(JSON.parse(unpack(`locales/${locale}.json`)), JSON.parse(await readFile(path.join(root, 'locales', `${locale}.json`), 'utf8')))
+}
+const bundle = unpack('dist/plugin.js')
 await writeFile(
   pluginPath,
   bundle.replaceAll('motrix:plugin-api', './mock.mjs')
@@ -88,7 +97,6 @@ if (patches[0].uris[0] !== 'https://cdn.example/smoke.mp4') {
 if (patches[0].filename !== undefined || metadata.get('filename') !== 'smoke test.mp4') {
   throw new Error('packed bundle must persist the title for host finalization')
 }
-const manifest = JSON.parse(await readFile(path.join(root, 'motrix-plugin.json'), 'utf8'))
 if (!manifest.permissions.includes('metadata')) {
   throw new Error('persisted title metadata requires the metadata permission')
 }
@@ -112,7 +120,7 @@ if (typeof inspect !== 'function') {
   throw new Error('packed bundle did not register the public inspection command')
 }
 const collection = await inspect({ url: ctx.uris[0] })
-if (collection.schemaVersion !== 1 || collection.defaultQuality !== '1080p' ||
+if (collection.schemaVersion !== 1 || collection.defaultQuality !== '720p' ||
     collection.entries.length !== 1 || collection.entries[0].id !== '2' ||
     collection.entries[0].url !== `${ctx.uris[0]}?p=1`) {
   throw new Error('packed inspection command returned incompatible collection metadata')
@@ -124,4 +132,40 @@ if (!mock.hostState.commands.has('community.bilibili-resolver.flushCache')) {
   throw new Error('packed bundle did not register the cache command')
 }
 
-console.log('✓ packed plugin bundle smoke test passed')
+const resolve = mock.hostState.commands.get('community.bilibili-resolver.resolve')
+const flush = mock.hostState.commands.get('community.bilibili-resolver.flushCache')
+for (const preference of ['highest', undefined, '720p']) {
+  mock.hostState.config.preferredQuality = preference
+  await flush({})
+  const requests = []
+  mock.hostState.request = async (options) => {
+    const url = new URL(options.url)
+    requests.push(url)
+    return {
+      status: 200, headers: [], finalUrl: options.url,
+      body: JSON.stringify({ code: 0, data: url.pathname.endsWith('/view') ? {
+        bvid: 'BV1GJ411x7h7', aid: 1, title: 'packed selected part', cid: 2,
+        pages: [{ cid: 2, page: 1, part: 'one' }, { cid: 3, page: 2, part: 'two' }],
+      } : {
+        quality: 80, dash: {
+          video: [
+            { id: 120, width: 3840, height: 2160, codecid: 12, baseUrl: 'https://cdn.example/4k.m4s' },
+            { id: 64, width: 1280, height: 720, codecid: 7, baseUrl: 'https://cdn.example/720p.m4s' },
+          ],
+          audio: [{ id: 30280, baseUrl: 'https://cdn.example/audio.m4s' }],
+        },
+      } }),
+    }
+  }
+  const preview = await inspect({ url: ctx.uris[0] })
+  const expectedQuality = preference === '720p' ? '720p' : '2160p'
+  assert.equal(preview.defaultQuality, expectedQuality)
+  const result = await resolve({ url: preview.entries[1].url, quality: preview.defaultQuality })
+  // Observable task inputs from the packed entry point, not source string checks.
+  assert.equal(result.kind, 'mux')
+  assert.equal(result.video.url, `https://cdn.example/${preference === '720p' ? '720p' : '4k'}.m4s`)
+  assert.equal(result.audio.url, 'https://cdn.example/audio.m4s')
+  assert.equal(result.title, 'packed selected part - P2 two')
+  assert(requests.some((url) => url.searchParams.get('cid') === '3' && url.searchParams.get('qn') === (preference === '720p' ? '64' : '120')))
+}
+console.log('✓ actual extension archive: manifest/locales, title hook, preview preference and 4K/720p mux task smoke passed')

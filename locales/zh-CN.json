@@ -7,8 +7,11 @@
   "settings.enabled.title": "启用",
   "settings.enabled.desc": "在下载开始前解析哔哩哔哩视频链接。",
   "settings.preferredQuality.title": "首选清晰度",
-  "settings.preferredQuality.desc": "请求的最高清晰度；实际受下载方式限制。Web/NAS 的单文件 MP4 通常最高 720P，1080P DASH 需要宿主支持音视频合并。",
+  "settings.preferredQuality.desc": "默认最高：在支持的 4K 档位内选择接口实际可用的最高清晰度；具体档位为请求上限。高清 DASH 需要宿主支持音视频合并。",
   "settings.cookie.title": "登录 Cookie",
   "settings.cookie.desc": "可选。粘贴 SESSDATA 或完整 Cookie，以访问账号允许的清晰度；不保证单文件 MP4 达到 1080P。仅保存在本机，由解析器只发送给 api.bilibili.com。",
-  "cmd.inspectMedia": "查看哔哩哔哩分 P"
+  "cmd.inspectMedia": "查看哔哩哔哩分 P",
+  "settings.quality.highest": "最高",
+  "settings.showSinglePartDialog.title": "单 P 视频显示选择弹窗",
+  "settings.showSinglePartDialog.desc": "开启后单 P 视频先选择清晰度；关闭后按首选清晰度直接下载，多 P 视频始终显示选择弹窗。需要支持此设置的宿主。"
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import manifest from '../motrix-plugin.json'
+import en from '../locales/en-US.json'
+import zh from '../locales/zh-CN.json'
 
 describe('plugin manifest', () => {
   it('declares the permission required for persisted title metadata', () => {
@@ -36,13 +38,25 @@ describe('plugin manifest', () => {
     expect(flush?.public).toBe(false)
   })
 
-  it('uses the same five quality choices for inspection, resolve and settings', () => {
+  it('keeps protocol concrete while exposing Highest and the single-part toggle in plugin settings', () => {
     const qualities = ['2160p', '1440p', '1080p', '720p', '480p']
     const inspect = manifest.contributes.commands.find((command) => command.id.endsWith('.inspectMedia'))
     const resolve = manifest.contributes.commands.find((command) => command.id.endsWith('.resolve'))
     expect(inspect?.resultSchema.properties.qualities.items.enum).toEqual(qualities)
     expect(resolve?.argsSchema.properties.quality.enum).toEqual(qualities)
-    expect(manifest.contributes.configuration.schema.properties.preferredQuality.enum).toEqual(qualities)
+    expect(inspect?.resultSchema.properties.defaultQuality.enum).toEqual(qualities)
+    const settings = manifest.contributes.configuration.schema.properties
+    expect(settings.preferredQuality.enum).toEqual(['highest', ...qualities])
+    expect(settings.preferredQuality.default).toBe('highest')
+    expect(Object.keys(settings.preferredQuality.enumLabels)).toHaveLength(6)
+    expect(settings.preferredQuality.enumLabels.highest).toBe('%settings.quality.highest%')
+    expect(zh['settings.quality.highest']).toBe('最高')
+    expect(en['settings.quality.highest']).toBe('Highest')
+    expect(settings.showSinglePartDialog).toMatchObject({ type: 'boolean', default: false })
+    expect(zh['settings.showSinglePartDialog.title']).toContain('单 P')
+    expect(en['settings.showSinglePartDialog.title']).toContain('single-part')
+    expect(manifest.id).toBe('community.bilibili-resolver')
+    expect(manifest.version).toBe('1.3.6')
   })
 
   it('can be selected for bilibili.com and b23.tv task URLs', () => {
