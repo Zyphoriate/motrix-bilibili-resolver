@@ -56,9 +56,9 @@ https://www.bilibili.com/video/BV17Yy3zxE9F/?p=1
 https://www.bilibili.com/video/BV17Yy3zxE9F/?p=2
 ```
 
-每条链接创建一个对应 P 的任务；不带 `p` 时默认第一 P。当前没有自动展开全部 P。
+原版宿主的 `beforeCreate` hook 路径中，每条链接创建一个对应 P 的任务；不带 `p` 时默认第一 P。该路径不自动展开全部 P。
 
-Motrix 的 `ctx.update({ uris })` 中多个 URI 表示同一文件的镜像，不是多个视频。插件 SDK 没有创建子下载任务的接口，因此自动全部 P 需要宿主增加列表展开与任务调度能力。暂时可把每 P 的页面链接分别加入任务列表。
+配套 Motrix fork 会调用 `inspectMedia` 打开分 P 选择列表，再为每个选中的 P 分别创建媒体任务。Motrix 的 `ctx.update({ uris })` 中多个 URI 仍表示同一文件的镜像，不是多个视频。插件 SDK 没有创建子下载任务的接口，列表展开和调度由接入媒体协议的宿主完成；使用仅调用 hook 的原版宿主时，可把每 P 的页面链接分别加入任务列表。
 
 ## 设置
 

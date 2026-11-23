@@ -56,9 +56,9 @@ https://www.bilibili.com/video/BV17Yy3zxE9F/?p=1
 https://www.bilibili.com/video/BV17Yy3zxE9F/?p=2
 ```
 
-Each URL creates one task for the selected part. A URL without `p` defaults to the first part. Automatic expansion of every part is not implemented.
+In the original host's `beforeCreate` hook path, each URL creates one task for the selected part, and a URL without `p` defaults to the first part. That path does not automatically expand all parts.
 
-Multiple `uris` in `ctx.update` are mirrors of one file, not separate videos. The plugin SDK provides no child-download creation API, so automatic all-part download requires host support for list expansion and scheduling. For now, add each part's page URL to the task list separately.
+The companion Motrix fork calls `inspectMedia` to open a multipart selection list, then creates a separate media task for each selected part. Multiple `uris` in `ctx.update` remain mirrors of one file, not separate videos. The plugin SDK provides no child-download creation API, so list expansion and scheduling belong to the integrated host. With an original host that only uses the hook path, add each part's page URL separately.
 
 ## Settings
 
