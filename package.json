@@ -1,0 +1,35 @@
+{
+  "name": "motrix-bilibili-resolver",
+  "version": "1.3.5",
+  "private": true,
+  "type": "module",
+  "description": "A Motrix site-resolver plugin that turns Bilibili video page links into downloadable MP4 URLs.",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --maxWorkers=1 --no-file-parallelism",
+    "test:watch": "vitest",
+    "live-check": "node scripts/live-check.mjs",
+    "smoke:packed": "node scripts/packed-smoke.mjs",
+    "validate": "motrix-plugin validate",
+    "pack": "motrix-plugin pack",
+    "lint": "motrix-plugin lint",
+    "reset-state": "node scripts/reset-plugin-state.mjs"
+  },
+  "devDependencies": {
+    "@motrix/plugin-api": "file:vendor/sdk/motrix-plugin-api-2.3.0-media.1.tgz",
+    "@motrix/plugin-cli": "file:vendor/sdk/motrix-plugin-cli-2.3.0-media.1.tgz",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4",
+    "@motrix/plugin-manifest-schema": "file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.1.tgz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Zyphoriate/motrix-bilibili-resolver.git"
+  },
+  "homepage": "https://github.com/Zyphoriate/motrix-bilibili-resolver"
+}

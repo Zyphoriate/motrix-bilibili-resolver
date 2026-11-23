@@ -1,0 +1,295 @@
+{
+  "$schema": "https://motrix.app/schemas/plugin/v1.json",
+  "manifestVersion": 1,
+  "id": "community.bilibili-resolver",
+  "name": "%name%",
+  "version": "1.3.5",
+  "description": "%description%",
+  "author": "Community",
+  "license": "MIT",
+  "icon": "icon.png",
+  "keywords": [
+    "bilibili",
+    "b23",
+    "video",
+    "resolver",
+    "download"
+  ],
+  "categories": [
+    "site-resolver",
+    "post-action"
+  ],
+  "engines": {
+    "motrix": ">=2.0.0 <3.0.0"
+  },
+  "main": "dist/plugin.js",
+  "requestedHeapMB": 48,
+  "permissions": [
+    "http",
+    "metadata"
+  ],
+  "hostPermissions": [
+    "*://bilibili.com/*",
+    "*://*.bilibili.com/*",
+    "*://b23.tv/*"
+  ],
+  "activationEvents": [
+    "*",
+    "onTaskType:http",
+    "onProtocol:https",
+    "onProtocol:http"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "community.bilibili-resolver.inspectMedia",
+        "title": "%cmd.inspectMedia%",
+        "public": true,
+        "argsSchema": {
+          "type": "object",
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            }
+          }
+        },
+        "resultSchema": {
+          "type": "object",
+          "required": [
+            "schemaVersion",
+            "title",
+            "entries",
+            "qualities",
+            "defaultQuality"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "type": "integer",
+              "enum": [
+                1
+              ]
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "title",
+                  "url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  },
+                  "partNumber": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "durationSeconds": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "qualities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "2160p",
+                  "1440p",
+                  "1080p",
+                  "720p",
+                  "480p"
+                ]
+              }
+            },
+            "defaultQuality": {
+              "type": "string",
+              "enum": [
+                "1080p"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "community.bilibili-resolver.resolve",
+        "title": "%cmd.resolve%",
+        "public": true,
+        "argsSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "2160p",
+                "1440p",
+                "1080p",
+                "720p",
+                "480p"
+              ]
+            },
+            "cookies": {
+              "type": "string",
+              "maxLength": 8192
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        },
+        "resultSchema": {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "direct",
+                "mux"
+              ]
+            },
+            "directUrl": {
+              "type": "string"
+            },
+            "headers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "video": {
+              "type": "object",
+              "required": [
+                "url"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "audio": {
+              "type": "object",
+              "required": [
+                "url"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "container": {
+              "enum": [
+                "mp4",
+                "mkv"
+              ]
+            },
+            "title": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "id": "community.bilibili-resolver.flushCache",
+        "title": "%cmd.flushCache%",
+        "public": false
+      }
+    ],
+    "hooks": {
+      "beforeCreate": {
+        "role": "resolve"
+      },
+      "beforeFinalize": {
+        "role": "post-process"
+      }
+    },
+    "configuration": {
+      "title": "%settings.title%",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "title": "%settings.enabled.title%",
+            "description": "%settings.enabled.desc%"
+          },
+          "preferredQuality": {
+            "type": "string",
+            "enum": [
+              "2160p",
+              "1440p",
+              "1080p",
+              "720p",
+              "480p"
+            ],
+            "default": "720p",
+            "title": "%settings.preferredQuality.title%",
+            "description": "%settings.preferredQuality.desc%"
+          },
+          "cookie": {
+            "type": "string",
+            "default": "",
+            "secret": true,
+            "maxLength": 4096,
+            "title": "%settings.cookie.title%",
+            "description": "%settings.cookie.desc%"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "l10n": "locales"
+}

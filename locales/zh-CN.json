@@ -1,0 +1,14 @@
+{
+  "name": "哔哩哔哩解析器",
+  "description": "把哔哩哔哩视频页面链接（BV/av/b23.tv）解析为可下载的 MP4 直链，支持首选清晰度与可选登录 Cookie。",
+  "cmd.resolve": "解析哔哩哔哩链接",
+  "cmd.flushCache": "清空解析缓存",
+  "settings.title": "哔哩哔哩解析器",
+  "settings.enabled.title": "启用",
+  "settings.enabled.desc": "在下载开始前解析哔哩哔哩视频链接。",
+  "settings.preferredQuality.title": "首选清晰度",
+  "settings.preferredQuality.desc": "请求的最高清晰度；实际受下载方式限制。Web/NAS 的单文件 MP4 通常最高 720P，1080P DASH 需要宿主支持音视频合并。",
+  "settings.cookie.title": "登录 Cookie",
+  "settings.cookie.desc": "可选。粘贴 SESSDATA 或完整 Cookie，以访问账号允许的清晰度；不保证单文件 MP4 达到 1080P。仅保存在本机，由解析器只发送给 api.bilibili.com。",
+  "cmd.inspectMedia": "查看哔哩哔哩分 P"
+}

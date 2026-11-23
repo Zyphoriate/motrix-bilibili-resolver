@@ -1,0 +1,14 @@
+{
+  "name": "Bilibili Resolver",
+  "description": "Turn Bilibili video page links (BV/av/b23.tv) into downloadable MP4 URLs, with your preferred quality and optional login cookie.",
+  "cmd.resolve": "Resolve Bilibili URL",
+  "cmd.flushCache": "Flush Resolver Cache",
+  "settings.title": "Bilibili Resolver",
+  "settings.enabled.title": "Enabled",
+  "settings.enabled.desc": "Resolve Bilibili video links before the download starts.",
+  "settings.preferredQuality.title": "Preferred quality",
+  "settings.preferredQuality.desc": "Highest quality to request. Web/NAS progressive MP4 normally tops out at 720P; 1080P DASH requires host video/audio merging support.",
+  "settings.cookie.title": "Login cookie",
+  "settings.cookie.desc": "Optional. Paste SESSDATA or a full Cookie header for account-authorized quality; progressive 1080P is not guaranteed. Stored locally and sent by the resolver only to api.bilibili.com.",
+  "cmd.inspectMedia": "Inspect Bilibili parts"
+}

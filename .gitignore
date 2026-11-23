@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.cache/
+*.log
+output/
+coverage/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite*
+*cookies*.txt
+*.moext
