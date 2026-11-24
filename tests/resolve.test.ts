@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearApiCache } from '../src/bilibili/api'
 import {
   buildDisplayTitle,
+  isValidMediaUrl,
   resolveBilibili,
   sanitizeFilename,
   toCommandResult,
@@ -174,6 +175,63 @@ describe('resolveBilibili DASH', () => {
 })
 
 describe('resolveBilibili quality and mux preference', () => {
+  function highestDeps(video: unknown[], quality: import('../src/bilibili/types').Quality = 'highest', directQuality = 127) {
+    const requests: string[] = []
+    const deps = makeDeps((url) => {
+      requests.push(url)
+      if (url.includes('/x/web-interface/view')) return json(VIEW_PAYLOAD)
+      if (param(url, 'fnval') !== '4048') return json(directPlayPayload({ quality: directQuality }))
+      return json({ code: 0, data: { quality: 127, dash: {
+        video, audio: [{ id: 30280, baseUrl: 'https://cdn.example/audio.m4s' }],
+      } } })
+    }, { quality })
+    return { deps, requests }
+  }
+
+  const fourK = { id: 120, width: 3840, height: 2160, baseUrl: 'https://cdn.example/4k.m4s', codecid: 7 }
+  const eightK = { id: 127, width: 7680, height: 4320, baseUrl: 'https://cdn.example/8k.m4s', codecid: 12 }
+
+  it.each([
+    [[fourK, eightK], '8k'],
+    [[eightK, { id: 999, width: 15360, height: 8640, baseUrl: 'https://cdn.example/future.m4s' }], 'future'],
+    [[fourK], '4k'],
+    [[{ id: 80, width: 1920, height: 1080, baseUrl: 'https://cdn.example/1080.m4s' }], '1080'],
+    [[fourK, { id: 127, baseUrl: 'https://cdn.example/8k.m4s' }], '8k'],
+    [[fourK, { id: 999, baseUrl: 'https://cdn.example/unknown.m4s' }], '4k'],
+    [[fourK, { ...eightK, baseUrl: 'https://' }, { ...eightK, baseUrl: 'ftp://cdn.example/8k.m4s' }], '4k'],
+  ])('highest selects available resolution without a QN or dimension ceiling: %s', async (video, expected) => {
+    const { deps, requests } = highestDeps(video as unknown[])
+    const result = await resolveBilibili(VIDEO_URL, deps, { forceMux: true }) as MuxResolution
+    expect(result.video.url).toBe(`https://cdn.example/${expected}.m4s`)
+    expect(requests.some((url) => param(url, 'qn') === '127' && param(url, 'fnval') === '4048')).toBe(true)
+    expect(requests.every((url) => !url.includes('highest'))).toBe(true)
+  })
+
+  it('preserves the concrete 2160p ceiling with 8K present', async () => {
+    const { deps } = highestDeps([fourK, eightK], '2160p')
+    const result = await resolveBilibili(VIDEO_URL, deps, { forceMux: true }) as MuxResolution
+    expect(result.video.url).toBe(fourK.baseUrl)
+  })
+
+  it('highest preferMux probes DASH even when a direct stream reports QN127', async () => {
+    const { deps, requests } = highestDeps([eightK, { id: 999, width: 15360, height: 8640, baseUrl: 'https://cdn.example/future.m4s' }])
+    const result = await resolveBilibili(VIDEO_URL, deps, { allowMux: true, preferMux: true }) as MuxResolution
+    expect(result.video.url).toBe('https://cdn.example/future.m4s')
+    expect(requests.some((url) => param(url, 'fnval') === '4048')).toBe(true)
+  })
+
+  it('breaks same-resolution ties by QN, AVC, bandwidth and stable URL order', async () => {
+    const { deps } = highestDeps([
+      { ...eightK, id: 126, codecid: 7, bandwidth: 99999999 },
+      { ...eightK, codecid: 12, bandwidth: 99999999 },
+      { ...eightK, codecid: 7, bandwidth: 100, baseUrl: 'https://cdn.example/z.m4s' },
+      { ...eightK, codecid: 7, bandwidth: 200, baseUrl: 'https://cdn.example/b.m4s' },
+      { ...eightK, codecid: 7, bandwidth: 200, baseUrl: 'https://cdn.example/a.m4s' },
+    ])
+    const result = await resolveBilibili(VIDEO_URL, deps, { forceMux: true }) as MuxResolution
+    expect(result.video.url).toBe('https://cdn.example/a.m4s')
+  })
+
   it.each([
     ['2160p', 120, '4K'],
     ['1440p', 120, '1440P'],
@@ -338,6 +396,43 @@ describe('resolveBilibili quality and mux preference', () => {
     expect(result.kind).toBe('direct')
     expect(result.quality).toBe(80)
     expect(dashCalls).toBe(0)
+  })
+})
+
+describe('media URL validation', () => {
+  it('resolves direct and highest DASH without a global URL constructor (QuickJS)', async () => {
+    vi.stubGlobal('URL', undefined)
+    try {
+      const deps = makeDeps((url) => {
+        if (url.includes('/x/web-interface/view')) return json(VIEW_PAYLOAD)
+        if (url.includes('fnval=4048')) return json(DASH_PAYLOAD)
+        return json(directPlayPayload())
+      }, { quality: 'highest' })
+      const direct = await resolveBilibili(VIDEO_URL, deps)
+      expect(direct).toMatchObject({ kind: 'direct', url: 'https://cdn.example/v.mp4' })
+      const mux = await resolveBilibili(VIDEO_URL, deps, { forceMux: true })
+      expect(mux).toMatchObject({ kind: 'mux', video: { url: 'https://cdn.example/v80-avc.m4s' } })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each([
+    'https://cdn.example/video.m4s',
+    'http://cdn.example/video.m4s?token=a%2Fb',
+  ])('accepts a well-formed absolute HTTP URL: %s', (url) => {
+    expect(isValidMediaUrl(url)).toBe(true)
+  })
+
+  it.each([
+    'ftp://cdn.example/video.m4s',
+    'https://',
+    'https:///video.m4s',
+    'https://cdn.example\\@evil.example/video.m4s',
+    'https://cdn.example/%zz/video.m4s',
+    'https://cdn.example/video m4s',
+  ])('rejects malformed or non-HTTP media URL: %s', (url) => {
+    expect(isValidMediaUrl(url)).toBe(false)
   })
 })
 

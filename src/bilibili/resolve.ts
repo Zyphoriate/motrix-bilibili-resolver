@@ -214,8 +214,14 @@ function preferStableMediaUrl(stream: DashStream): DashStream {
   }
 }
 
-function isHttpUrl(url: string): boolean {
-  return /^https?:\/\//i.test(url)
+const HTTP_MEDIA_URL_RE = /^https?:\/\/[^/?#@\\\s]+(?:[/?#]|$)/i
+
+export function isValidMediaUrl(url: string): boolean {
+  return (
+    HTTP_MEDIA_URL_RE.test(url) &&
+    !/[\\\s\u0000-\u001f\u007f]/.test(url) &&
+    !/%(?![0-9a-f]{2})/i.test(url)
+  )
 }
 
 /**
@@ -229,7 +235,7 @@ function dedupeUrls(urls: ReadonlyArray<string>): string[] {
     if (
       typeof url === 'string' &&
       url.length > 0 &&
-      isHttpUrl(url) &&
+      isValidMediaUrl(url) &&
       !unique.includes(url)
     ) {
       unique.push(url)
@@ -239,10 +245,16 @@ function dedupeUrls(urls: ReadonlyArray<string>): string[] {
 }
 
 function streamResolution(stream: DashStream): number {
-  if ((stream.width ?? 0) > 0 && (stream.height ?? 0) > 0) {
+  if (Number.isFinite(stream.width) && Number.isFinite(stream.height) &&
+      (stream.width ?? 0) > 0 && (stream.height ?? 0) > 0) {
     return Math.min(stream.width!, stream.height!)
   }
-  return stream.id >= 120 ? 2160 : stream.id >= 80 ? 1080 : stream.id >= 64 ? 720 : stream.id >= 32 ? 480 : 360
+  // Only infer dimensions for known QNs; future QNs need actual dimensions.
+  const known: Record<number, number> = {
+    127: 4320, 126: 2160, 125: 2160, 120: 2160,
+    116: 1080, 112: 1080, 80: 1080, 74: 720, 64: 720, 32: 480, 16: 360, 6: 240,
+  }
+  return known[stream.id] ?? 0
 }
 
 function pickDashVideo(
@@ -251,22 +263,22 @@ function pickDashVideo(
 ): DashStream | null {
   const ceiling = Number.parseInt(quality, 10)
   const pool = streams.filter((stream) =>
-    stream.url.length > 0 && stream.id <= qualityToQn(quality) &&
-    streamResolution(stream) <= ceiling
+    isValidMediaUrl(stream.url) && (quality === 'highest' ||
+      (stream.id <= qualityToQn(quality) && streamResolution(stream) <= ceiling))
   )
   // Prefer resolution before codec: a lower-resolution AVC must not hide 4K
-  // HEVC/AV1. At the same resolution/QN, prefer AVC for compatibility.
+  // HEVC/AV1. Ties: QN, AVC compatibility, bandwidth, then URL for stability.
   pool.sort((a, b) =>
     streamResolution(b) - streamResolution(a) || b.id - a.id ||
     Number(b.codecid === 7) - Number(a.codecid === 7) ||
-    (b.bandwidth ?? 0) - (a.bandwidth ?? 0)
+    (b.bandwidth ?? 0) - (a.bandwidth ?? 0) || a.url.localeCompare(b.url)
   )
   return pool[0] ?? null
 }
 
 function pickDashAudio(streams: ReadonlyArray<DashStream>): DashStream | null {
   const playable = streams
-    .filter((stream) => stream.url.length > 0)
+    .filter((stream) => isValidMediaUrl(stream.url))
     .sort(
       (a, b) =>
         b.id - a.id || (b.bandwidth ?? 0) - (a.bandwidth ?? 0)
@@ -427,7 +439,7 @@ async function tryMux(
   if (!pickedVideo || !pickedAudio) return null
   const video = preferStableMediaUrl(pickedVideo)
   const audio = preferStableMediaUrl(pickedAudio)
-  if (!isHttpUrl(video.url) || !isHttpUrl(audio.url)) return null
+  if (!isValidMediaUrl(video.url) || !isValidMediaUrl(audio.url)) return null
 
   const quality = video.id
   const label = streamResolution(video) > 1080 && streamResolution(video) <= 1440
@@ -510,7 +522,7 @@ export async function inspectBilibili(
     schemaVersion: 1,
     title: (info.title.trim() || info.bvid || `av${info.aid}`).slice(0, 512),
     entries,
-    qualities: ['2160p', '1440p', '1080p', '720p', '480p'],
+    qualities: ['highest', '2160p', '1440p', '1080p', '720p', '480p'],
     defaultQuality: deps.quality,
   }
 }
@@ -560,7 +572,7 @@ export async function resolveBilibili(
 
   const preferredQn = qualityToQn(deps.quality)
   const directMeetsPreferred =
-    direct.result !== null && direct.result.quality >= preferredQn
+    deps.quality !== 'highest' && direct.result !== null && direct.result.quality >= preferredQn
 
   if (direct.result && (!options.preferMux || directMeetsPreferred)) {
     return direct.result
@@ -578,10 +590,11 @@ export async function resolveBilibili(
         meta
       )
       if (mux) {
-        // Only take the mux path when it actually improves on the MP4; a
-        // same-quality mux would force FFmpeg for no benefit.
+        // Concrete qualities keep the existing direct-vs-mux QN comparison.
+        // Highest must inspect DASH: progressive QN cannot prove a resolution
+        // ceiling, and future DASH resolutions may use unrelated QNs.
         if (
-          direct.result &&
+          deps.quality !== 'highest' && direct.result &&
           mux.quality <= direct.result.quality
         ) {
           return direct.result

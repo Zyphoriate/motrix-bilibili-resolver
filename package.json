@@ -1,6 +1,6 @@
 {
   "name": "motrix-bilibili-resolver",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "private": true,
   "type": "module",
   "description": "A Motrix site-resolver plugin that turns Bilibili video page links into downloadable MP4 URLs.",
@@ -20,12 +20,12 @@
     "reset-state": "node scripts/reset-plugin-state.mjs"
   },
   "devDependencies": {
-    "@motrix/plugin-api": "file:vendor/sdk/motrix-plugin-api-2.3.0-media.2.tgz",
-    "@motrix/plugin-cli": "file:vendor/sdk/motrix-plugin-cli-2.3.0-media.2.tgz",
+    "@motrix/plugin-api": "file:vendor/sdk/motrix-plugin-api-2.3.0-media.3.tgz",
+    "@motrix/plugin-cli": "file:vendor/sdk/motrix-plugin-cli-2.3.0-media.3.tgz",
     "esbuild": "^0.24.2",
     "typescript": "^5.6.3",
     "vitest": "^3.2.4",
-    "@motrix/plugin-manifest-schema": "file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.2.tgz"
+    "@motrix/plugin-manifest-schema": "file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.3.tgz"
   },
   "repository": {
     "type": "git",

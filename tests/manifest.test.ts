@@ -38,15 +38,15 @@ describe('plugin manifest', () => {
     expect(flush?.public).toBe(false)
   })
 
-  it('keeps protocol concrete while exposing Highest and the single-part toggle in plugin settings', () => {
-    const qualities = ['2160p', '1440p', '1080p', '720p', '480p']
+  it('exposes highest across the protocol and settings', () => {
+    const qualities = ['highest', '2160p', '1440p', '1080p', '720p', '480p']
     const inspect = manifest.contributes.commands.find((command) => command.id.endsWith('.inspectMedia'))
     const resolve = manifest.contributes.commands.find((command) => command.id.endsWith('.resolve'))
     expect(inspect?.resultSchema.properties.qualities.items.enum).toEqual(qualities)
     expect(resolve?.argsSchema.properties.quality.enum).toEqual(qualities)
     expect(inspect?.resultSchema.properties.defaultQuality.enum).toEqual(qualities)
     const settings = manifest.contributes.configuration.schema.properties
-    expect(settings.preferredQuality.enum).toEqual(['highest', ...qualities])
+    expect(settings.preferredQuality.enum).toEqual(qualities)
     expect(settings.preferredQuality.default).toBe('highest')
     expect(Object.keys(settings.preferredQuality.enumLabels)).toHaveLength(6)
     expect(settings.preferredQuality.enumLabels.highest).toBe('%settings.quality.highest%')
@@ -56,7 +56,7 @@ describe('plugin manifest', () => {
     expect(zh['settings.showSinglePartDialog.title']).toContain('单 P')
     expect(en['settings.showSinglePartDialog.title']).toContain('single-part')
     expect(manifest.id).toBe('community.bilibili-resolver')
-    expect(manifest.version).toBe('1.3.6')
+    expect(manifest.version).toBe('1.3.7')
   })
 
   it('can be selected for bilibili.com and b23.tv task URLs', () => {

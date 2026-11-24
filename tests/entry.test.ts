@@ -126,9 +126,9 @@ describe('plugin entry point (mocked host)', () => {
   })
 
   it.each([
-    ['highest', '2160p', '120', 'v120.m4s'],
-    [undefined, '2160p', '120', 'v120.m4s'],
-    ['invalid-old-value', '2160p', '120', 'v120.m4s'],
+    ['highest', 'highest', '127', 'v127.m4s'],
+    [undefined, 'highest', '127', 'v127.m4s'],
+    ['invalid-old-value', 'highest', '127', 'v127.m4s'],
     ['2160p', '2160p', '120', 'v120.m4s'],
     ['1440p', '1440p', '120', 'v80-avc.m4s'],
     ['1080p', '1080p', '80', 'v80-avc.m4s'],
@@ -146,6 +146,7 @@ describe('plugin entry point (mocked host)', () => {
           ...DASH_PAYLOAD.data.dash,
           video: [
             ...DASH_PAYLOAD.data.dash.video,
+            { id: 127, width: 7680, height: 4320, codecid: 12, baseUrl: 'https://cdn.example/v127.m4s' },
             { id: 120, width: 3840, height: 2160, codecid: 12, baseUrl: 'https://cdn.example/v120.m4s' },
             { id: 32, width: 854, height: 480, codecid: 7, baseUrl: 'https://cdn.example/v32.m4s' },
           ],
@@ -159,11 +160,11 @@ describe('plugin entry point (mocked host)', () => {
     }
     expect(preview.defaultQuality).toBe(expectedQuality)
     expect(preview.qualities).toContain(preview.defaultQuality)
-    expect(preview.qualities).not.toContain('highest')
+    expect(preview.qualities).toEqual(['highest', '2160p', '1440p', '1080p', '720p', '480p'])
     expect(requests).toHaveLength(1)
     const resolve = hostState.commands.get('community.bilibili-resolver.resolve')!
     // Model the host's visible task seam: the selected P uses the preview's
-    // concrete quality, and its downloaded streams become the mux task inputs.
+    // selected quality, and its downloaded streams become the mux task inputs.
     const tasks: Array<{ source: string; video: string; audio: string; output: string }> = []
     const selected = preview.entries[1]!
     const resolution = await resolve({ url: selected.url, quality: preview.defaultQuality }) as {
@@ -180,7 +181,7 @@ describe('plugin entry point (mocked host)', () => {
     expect(requests.every((url) => !url.includes('highest'))).toBe(true)
   })
 
-  it.each(['highest', undefined])('maps %s to 4K before resolving and falls back to available DASH', async (preference) => {
+  it.each(['highest', undefined])('requests highest ladder for %s and falls back to available DASH', async (preference) => {
     hostState.config.preferredQuality = preference
     let requestedQn: string | null = null
     fakeHostRequest((url) => {
@@ -190,17 +191,17 @@ describe('plugin entry point (mocked host)', () => {
     })
     const resolve = hostState.commands.get('community.bilibili-resolver.resolve')!
     const result = await resolve({ url: 'https://www.bilibili.com/video/BV1GJ411x7h7/?p=2' })
-    expect(requestedQn).toBe('120')
+    expect(requestedQn).toBe('127')
     expect(result).toMatchObject({ kind: 'mux', video: { url: 'https://cdn.example/v80-avc.m4s' }, title: '测试视频 - P2 第二集' })
   })
 
-  it('keeps highest out of the strict public resolve protocol', async () => {
-    hostState.request = async () => { throw new Error('must not request') }
+  it('accepts highest in the public resolve protocol', async () => {
+    fakeHostRequest((url) => url.includes('/x/web-interface/view') ? VIEW_PAYLOAD : DASH_PAYLOAD)
     const resolve = hostState.commands.get('community.bilibili-resolver.resolve')!
-    await expect(resolve({ url: 'https://www.bilibili.com/video/BV1GJ411x7h7/', quality: 'highest' })).rejects.toThrow('unsupported quality')
+    await expect(resolve({ url: 'https://www.bilibili.com/video/BV1GJ411x7h7/', quality: 'highest' })).resolves.toMatchObject({ kind: 'mux' })
   })
 
-  it('starts the default progressive hook at 4K but stages the available MP4 task', async () => {
+  it('starts the default progressive hook at QN127 but stages the available MP4 task', async () => {
     hostState.config.preferredQuality = undefined
     const qns: Array<string | null> = []
     fakeHostRequest((url) => {
@@ -210,7 +211,7 @@ describe('plugin entry point (mocked host)', () => {
     })
     const { ctx, patches } = makeContext('https://www.bilibili.com/video/BV1GJ411x7h7/?p=2')
     await hostState.beforeCreate!(ctx)
-    expect(qns[0]).toBe('120')
+    expect(qns[0]).toBe('127')
     expect(patches[0]?.uris).toEqual(['https://cdn.example/v.mp4', 'https://cdn2.example/v.mp4'])
     expect(ctx.metadata.get('filename')).toBe('测试视频 - P2 第二集.mp4')
   })

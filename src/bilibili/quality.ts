@@ -1,6 +1,7 @@
 import type { Quality } from './types'
 
 const QN_BY_QUALITY: Record<Quality, number> = {
+  highest: 127,
   '2160p': 120,
   // Bilibili has no 1440p QN. Request the 4K ladder, then cap DASH dimensions.
   '1440p': 120,
@@ -41,7 +42,10 @@ export function qualityCandidates(quality: Quality): number[] {
   const preferred = qualityToQn(quality)
   // Progressive responses do not carry dimensions to distinguish 2K from 4K.
   const ceiling = quality === '1440p' ? 116 : preferred
-  return [120, 116, 112, 80, 64, 32, 16].filter(
+  if (quality !== 'highest') {
+    return [120, 116, 112, 80, 64, 32, 16].filter((qn) => qn <= ceiling)
+  }
+  return [127, 126, 125, 120, 116, 112, 80, 74, 64, 32, 16].filter(
     (qn, index, all) => qn <= ceiling && all.indexOf(qn) === index
   )
 }

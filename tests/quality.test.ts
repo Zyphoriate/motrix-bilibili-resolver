@@ -8,6 +8,7 @@ import {
 
 describe('quality mapping', () => {
   it('maps user-facing qualities to API qn values', () => {
+    expect(qualityToQn('highest')).toBe(127)
     expect(qualityToQn('2160p')).toBe(120)
     expect(qualityToQn('1440p')).toBe(120)
     expect(qualityToQn('1080p')).toBe(80)
@@ -16,6 +17,7 @@ describe('quality mapping', () => {
   })
 
   it('builds a descending, deduplicated fallback list', () => {
+    expect(qualityCandidates('highest')).toEqual([127, 126, 125, 120, 116, 112, 80, 74, 64, 32, 16])
     expect(qualityCandidates('2160p')).toEqual([120, 116, 112, 80, 64, 32, 16])
     expect(qualityCandidates('1440p')).toEqual([116, 112, 80, 64, 32, 16])
     expect(qualityCandidates('1080p')).toEqual([80, 64, 32, 16])
@@ -30,6 +32,7 @@ describe('quality mapping', () => {
   })
 
   it('validates quality config input', () => {
+    expect(isQuality('highest')).toBe(true)
     expect(isQuality('2160p')).toBe(true)
     expect(isQuality('1440p')).toBe(true)
     expect(isQuality('1080p')).toBe(true)

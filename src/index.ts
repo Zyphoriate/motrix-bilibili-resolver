@@ -30,12 +30,7 @@ import {
 } from './bilibili/types'
 import { hostOf, isBilibiliUrl } from './bilibili/url'
 
-type PreferredQuality = Quality | 'highest'
-const DEFAULT_QUALITY: PreferredQuality = 'highest'
-
-function concreteQuality(quality: PreferredQuality): Quality {
-  return quality === 'highest' ? '2160p' : quality
-}
+const DEFAULT_QUALITY: Quality = 'highest'
 const PLUGIN_ID = 'community.bilibili-resolver'
 
 // Diagnostic: proves the bundle was evaluated even if no hook is ever called.
@@ -47,7 +42,7 @@ try {
 
 interface Settings {
   enabled: boolean
-  preferredQuality: PreferredQuality
+  preferredQuality: Quality
   cookie: string
 }
 
@@ -68,7 +63,7 @@ async function readSettings(): Promise<Settings> {
 
   return {
     enabled: enabled !== false,
-    preferredQuality: quality === 'highest' || isQuality(quality) ? quality : DEFAULT_QUALITY,
+    preferredQuality: isQuality(quality) ? quality : DEFAULT_QUALITY,
     cookie: typeof cookie === 'string' ? cookie : '',
   }
 }
@@ -84,7 +79,7 @@ function createDeps(
   signal?: AbortSignal
 ): ResolverDeps {
   return {
-    quality: concreteQuality(settings.preferredQuality),
+    quality: settings.preferredQuality,
     cookie: settings.cookie || undefined,
     signal,
     request: async (
@@ -189,7 +184,7 @@ function parseResolveArgs(raw: JsonValue): ResolveArgs {
 
 async function resolveForCommand(
   url: string,
-  quality: PreferredQuality,
+  quality: Quality,
   cookies?: string
 ): Promise<Resolution> {
   const settings = await readSettings()

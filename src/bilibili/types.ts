@@ -1,6 +1,6 @@
 /** Pure types shared by the Bilibili resolver modules (no host imports). */
 
-export type Quality = '2160p' | '1440p' | '1080p' | '720p' | '480p'
+export type Quality = 'highest' | '2160p' | '1440p' | '1080p' | '720p' | '480p'
 
 export type HttpMethod = 'GET' | 'HEAD' | 'POST'
 

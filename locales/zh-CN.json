@@ -7,7 +7,7 @@
   "settings.enabled.title": "启用",
   "settings.enabled.desc": "在下载开始前解析哔哩哔哩视频链接。",
   "settings.preferredQuality.title": "首选清晰度",
-  "settings.preferredQuality.desc": "默认最高：在支持的 4K 档位内选择接口实际可用的最高清晰度；具体档位为请求上限。高清 DASH 需要宿主支持音视频合并。",
+  "settings.preferredQuality.desc": "默认最高：按接口实际返回选择最高分辨率，不设分辨率或 QN 上限；具体档位继续限制上限。DASH 需要宿主合并，最高协议需要配套新宿主。",
   "settings.cookie.title": "登录 Cookie",
   "settings.cookie.desc": "可选。粘贴 SESSDATA 或完整 Cookie，以访问账号允许的清晰度；不保证单文件 MP4 达到 1080P。仅保存在本机，由解析器只发送给 api.bilibili.com。",
   "cmd.inspectMedia": "查看哔哩哔哩分 P",

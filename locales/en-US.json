@@ -7,7 +7,7 @@
   "settings.enabled.title": "Enabled",
   "settings.enabled.desc": "Resolve Bilibili video links before the download starts.",
   "settings.preferredQuality.title": "Preferred quality",
-  "settings.preferredQuality.desc": "Defaults to Highest: choose the best available stream up to supported 4K. A specific quality sets the request ceiling. HD DASH requires host video/audio merging.",
+  "settings.preferredQuality.desc": "Defaults to Highest: select the highest resolution actually returned, without a resolution or QN ceiling. Specific qualities retain their ceiling. DASH needs host merging; highest needs the updated media-protocol host.",
   "settings.cookie.title": "Login cookie",
   "settings.cookie.desc": "Optional. Paste SESSDATA or a full Cookie header for account-authorized quality; progressive 1080P is not guaranteed. Stored locally and sent by the resolver only to api.bilibili.com.",
   "cmd.inspectMedia": "Inspect Bilibili parts",

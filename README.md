@@ -8,11 +8,11 @@ Repository: [Zyphoriate/motrix-bilibili-resolver](https://github.com/Zyphoriate/
 
 The companion [Motrix fork](https://github.com/Zyphoriate/motrix) integrates media selection and mux task creation. The stock Motrix 2.4.5 limitations described below apply to that original host; integrated hosts can use the public media protocol.
 
-## Changes in 1.3.6
+## Changes in 1.3.7
 
-- Adds **Highest** to the plugin settings Preferred quality dropdown and makes it the default. Saved specific qualities remain unchanged. Highest requests up to supported 4K and selects the best stream actually returned.
+- Adds **Highest** to the plugin settings Preferred quality dropdown and makes it the default. Saved specific qualities remain unchanged. Highest requests QN 127 with DASH flags and selects the highest resolution actually returned, including 8K or future higher resolutions, without a selection ceiling.
 - Adds **Show selection dialog for single-part videos** in the same plugin panel, off by default. Compatible hosts download single-part videos directly at the preferred quality when off; multipart videos always show selection.
-- Inspection now reports the configured concrete default quality, translating Highest to `2160p`; the public protocol retains its five concrete values.
+- Inspection and public resolution now preserve `highest` alongside the five concrete qualities. This requires the companion host with the `2.3.0-media.3` protocol; older hosts reject `highest` and must be upgraded together.
 
 ### Title naming retained from 1.3.5
 
@@ -24,15 +24,15 @@ The companion [Motrix fork](https://github.com/Zyphoriate/motrix) integrates med
 
 ## Media selection protocol
 
-Compatible hosts can call public `community.bilibili-resolver.inspectMedia` with `{url}` to list every part before creating downloads. The v1 result contains stable CID ids, `P<N>` titles, canonical `?p=N` URLs, duration metadata, the fixed `2160p`/`1440p`/`1080p`/`720p`/`480p` choices and the configured concrete default (`2160p` for Highest). Inspection only reads video metadata and rejects collections over 500 entries. It does not fetch media streams.
+Compatible hosts can call public `community.bilibili-resolver.inspectMedia` with `{url}` to list every part before creating downloads. The v1 result contains stable CID ids, `P<N>` titles, canonical `?p=N` URLs, duration metadata, the `highest`/`2160p`/`1440p`/`1080p`/`720p`/`480p` choices and the configured default (`highest` by default). Inspection only reads video metadata and rejects collections over 500 entries. It does not fetch media streams.
 
 For each selected entry, call the existing `.resolve` with `{url: entry.url, quality, cookies?}`. It returns a single DASH video/audio pair at the requested quality (with available lower-quality fallback), preserving the selected part in the title. The host creates tasks and merges streams. The plugin preference defaults to Highest for both inspection and the progressive hook, with fallback to available streams. The manifest also declares `post-action` for its `beforeFinalize` title handling; plugin identity remains unchanged.
 
 ## Install
 
-Install `dist/community.bilibili-resolver-1.3.6.moext` and approve `http` and `metadata`. The latter persists the title filename so finalization can use it even after a server restart. The plugin selects the final path in `beforeFinalize`; the host performs the actual rename and collision handling. The plugin does not directly write media files.
+Install `dist/community.bilibili-resolver-1.3.7.moext` and approve `http` and `metadata`. The latter persists the title filename so finalization can use it even after a server restart. The plugin selects the final path in `beforeFinalize`; the host performs the actual rename and collision handling. The plugin does not directly write media files.
 
-Requires Motrix `>=2.0.0 <3.0.0`. The Highest label and single-part dialog switch need a host supporting localized plugin option labels and media preferences. Upgrades retain the ID and existing settings. A new task may show a CDN filename while downloading and is published with its title at completion. Tasks created before the upgrade lack title metadata and are not renamed automatically.
+The manifest targets Motrix `>=2.0.0 <3.0.0`; media inspection and resolution require the updated companion host accepting `highest` (`2.3.0-media.3` contract). Older five-quality hosts reject this protocol; upgrade the host and plugin as a pair. The Highest label and single-part dialog switch need a host supporting localized plugin option labels and media preferences. Upgrades retain the ID and existing settings. A new task may show a CDN filename while downloading and is published with its title at completion. Tasks created before the upgrade lack title metadata and are not renamed automatically.
 
 ## Quality and entry points
 
@@ -41,15 +41,15 @@ Requires Motrix `>=2.0.0 <3.0.0`. The Highest label and single-part dialog switc
 | Motrix 2.4.5 Web/NAS Add Task | Calls `beforeCreate` and downloads progressive MP4 with video and audio; anonymous API access normally tops out at 720P |
 | A host mux entry point wired to the public resolver command | Receives separate DASH video/audio URLs; the host downloads and merges them using FFmpeg; anonymous 1080P can be requested |
 
-Preferred quality defaults to **Highest** (`highest`), mapped to the supported `2160p` ceiling before requesting streams. Saved specific values, such as `720p`, remain the ceiling. Progressive MP4 availability still depends on the endpoint; DASH HD requires host merging support.
+Preferred quality defaults to **Highest** (`highest`), which requests QN 127 and selects the best available DASH resolution without a QN or resolution ceiling. Saved specific values, such as `720p`, remain the ceiling. The legacy progressive hook starts at QN 127 and falls back through available MP4 qualities, without muxing or a promise of 8K. Progressive MP4 availability still depends on the endpoint; DASH HD requires host merging support.
 
 yt-dlp obtains anonymous 1080P DASH using `try_look=1` and merges the tracks with FFmpeg. This plugin's public command implements that resolution step, but **Motrix 2.4.5 Web/NAS Add Task does not call that command or the mux pipeline**. Installing FFmpeg, supplying a cookie, or choosing 1080P does not complete that missing host integration.
 
-Web/NAS HD muxing requires the host to call the public resolver during task creation and delegate download, merging, cancellation, and recovery to its media coordinator. Version 1.3.6 does not claim to fix this host limitation.
+Web/NAS HD muxing requires the host to call the public resolver during task creation and delegate download, merging, cancellation, and recovery to its media coordinator. Version 1.3.7 does not claim to fix this host limitation.
 
 ### 4K / 2K request semantics
 
-`2160p` requests Bilibili QN 120 with `fourk=1` and DASH capability flags. `1440p` also requests that ladder and selects the highest available DASH stream whose shorter image dimension is at most 1440 pixels (portrait videos included). Bilibili has no dedicated 1440p QN: 112 means **1080P+**, and 116 means **1080P60**, neither means 2K. When no actual 1440p stream is offered, selection falls back to 1080p or lower; it never relabels 1080P+ as 2K. Unknown dimensions at QN 120 are conservatively treated as 4K. Resolution is selected before codec, with AVC preferred only within the same resolution and QN.
+`2160p` requests Bilibili QN 120 with `fourk=1` and DASH capability flags. `1440p` also requests that ladder and selects the highest available DASH stream whose shorter image dimension is at most 1440 pixels (portrait videos included). Bilibili has no dedicated 1440p QN: 112 means **1080P+**, and 116 means **1080P60**, neither means 2K. When no actual 1440p stream is offered, selection falls back to 1080p or lower; it never relabels 1080P+ as 2K. Missing dimensions at known QN 127 imply 4320p and QN 120 implies 2160p; unknown QNs without dimensions rank below measured or known resolutions. Selection compares the shorter image dimension first, then QN, AVC compatibility, bandwidth and URL order. Invalid HTTP(S) stream URLs are excluded.
 
 Actual 4K/2K availability depends on the video, account entitlements, cookie, and returned streams. The plugin does not upscale. A compatible host with FFmpeg is required for DASH merging. Protocol reference: [Bilibili playback QN table](https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/video/videostream_url.md).
 
@@ -120,23 +120,18 @@ This repairs SQLite state; it cannot clear memory in a separately running Motrix
 npm ci
 npm test
 npm run typecheck
-npm run build
-npm run validate
-npm run lint
-npm run pack
-npm run smoke:packed
 npm run live-check
 ```
 
-Unit tests, mocked-host tests, and packed-bundle smoke tests do not replace end-to-end Web/NAS verification. Version 1.3.6 adds the quality preference and single-part dialog settings; the compatible host owns dialog rendering, scheduling, and mux tasks.
+Unit tests, mocked-host tests, and packed-bundle smoke tests do not replace end-to-end Web/NAS verification. Version 1.3.7 adds the quality preference and single-part dialog settings; the compatible host owns dialog rendering, scheduling, and mux tasks.
 
 Bangumi, live streams, courses, paid content, and DRM are unsupported. Bilibili APIs and available quality can change.
 
 ### Reproducible standalone Build
 
-Use Node.js 24 LTS (minimum 22.16), npm, and `unzip` for the actual extension-archive smoke test. Clone this repository and run the commands above from its root. The SDK API, CLI, and manifest-schema archives are included in `vendor/sdk`; the lockfile pins their integrity. No adjacent checkout, global Motrix CLI, or npm publication is required. The SDK is the `2.3.0-media.1` media-protocol variant from the companion fork; upstream SDK code is MIT licensed, with license files inside the archives.
+Use Node.js 24 LTS (minimum 22.16), npm, and `unzip` for the actual extension-archive smoke test. Clone this repository and run the local test/typecheck commands above from its root. Build, validate, lint, pack and actual archive smoke verification run in GitHub Actions; obtain final artifacts there. The SDK API, CLI, and manifest-schema archives are included in `vendor/sdk`; the lockfile pins their integrity. No adjacent checkout, global Motrix CLI, or npm publication is required. The SDK is the `2.3.0-media.3` media-protocol variant from the companion fork; upstream SDK code is MIT licensed, with license files inside the archives.
 
-The **Build** workflow runs on pushes, pull requests, and manual dispatch. It uses `npm ci`, typechecks, unit tests with one worker, validates, bundles, lints, packs, and smoke-tests the packed bundle. Node memory is capped at 1536 MiB. Download `bilibili-resolver-1.3.6-<commit>` from a successful run's **Artifacts** section; unpack it to obtain `community.bilibili-resolver-1.3.6.moext` and `SHA256SUMS`, then run `sha256sum -c SHA256SUMS` in that directory. Import the `.moext` into Motrix. GitHub may require sign-in for artifact downloads. Builds do not publish to npm or create release tags. Live checks are optional network checks and are not run in CI.
+The **Build** workflow runs on pushes, pull requests, and manual dispatch. It uses `npm ci`, typechecks, unit tests with one worker, validates, bundles, lints, packs, and smoke-tests the packed bundle. Node memory is capped at 1536 MiB. Download `bilibili-resolver-1.3.7-<commit>` from a successful run's **Artifacts** section; unpack it to obtain `community.bilibili-resolver-1.3.7.moext` and `SHA256SUMS`, then run `sha256sum -c SHA256SUMS` in that directory. Import the `.moext` into Motrix. GitHub may require sign-in for artifact downloads. Builds do not publish to npm or create release tags. Live checks are optional network checks and are not run in CI.
 
 ## License
 

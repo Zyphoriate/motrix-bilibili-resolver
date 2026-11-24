@@ -29,7 +29,14 @@ await build({
 const manifest = JSON.parse(await readFile(path.join(root, 'motrix-plugin.json'), 'utf8'))
 const archive = path.join(root, 'dist', `${manifest.id}-${manifest.version}.moext`)
 const unpack = (entry) => execFileSync('unzip', ['-p', archive, entry], { encoding: 'utf8' })
-assert.deepEqual(JSON.parse(unpack('motrix-plugin.json')), manifest)
+const packedManifest = JSON.parse(unpack('motrix-plugin.json'))
+assert.deepEqual(packedManifest, manifest)
+const qualities = ['highest', '2160p', '1440p', '1080p', '720p', '480p']
+const inspectSchema = packedManifest.contributes.commands.find((command) => command.id.endsWith('.inspectMedia')).resultSchema.properties
+const resolveSchema = packedManifest.contributes.commands.find((command) => command.id.endsWith('.resolve')).argsSchema.properties
+assert.deepEqual(inspectSchema.qualities.items.enum, qualities)
+assert.deepEqual(inspectSchema.defaultQuality.enum, qualities)
+assert.deepEqual(resolveSchema.quality.enum, qualities)
 for (const locale of ['en-US', 'zh-CN']) {
   assert.deepEqual(JSON.parse(unpack(`locales/${locale}.json`)), JSON.parse(await readFile(path.join(root, 'locales', `${locale}.json`), 'utf8')))
 }
@@ -149,6 +156,7 @@ for (const preference of ['highest', undefined, '720p']) {
       } : {
         quality: 80, dash: {
           video: [
+            { id: 127, width: 7680, height: 4320, codecid: 12, baseUrl: 'https://cdn.example/8k.m4s' },
             { id: 120, width: 3840, height: 2160, codecid: 12, baseUrl: 'https://cdn.example/4k.m4s' },
             { id: 64, width: 1280, height: 720, codecid: 7, baseUrl: 'https://cdn.example/720p.m4s' },
           ],
@@ -158,14 +166,17 @@ for (const preference of ['highest', undefined, '720p']) {
     }
   }
   const preview = await inspect({ url: ctx.uris[0] })
-  const expectedQuality = preference === '720p' ? '720p' : '2160p'
+  const expectedQuality = preference === '720p' ? '720p' : 'highest'
   assert.equal(preview.defaultQuality, expectedQuality)
+  assert.deepEqual(preview.qualities, qualities)
   const result = await resolve({ url: preview.entries[1].url, quality: preview.defaultQuality })
   // Observable task inputs from the packed entry point, not source string checks.
   assert.equal(result.kind, 'mux')
-  assert.equal(result.video.url, `https://cdn.example/${preference === '720p' ? '720p' : '4k'}.m4s`)
+  assert.equal(result.video.url, `https://cdn.example/${preference === '720p' ? '720p' : '8k'}.m4s`)
   assert.equal(result.audio.url, 'https://cdn.example/audio.m4s')
+  assert(requests.every((url) => !url.href.includes('highest')))
+  assert(requests.some((url) => url.searchParams.get('fnval') === '4048'))
   assert.equal(result.title, 'packed selected part - P2 two')
-  assert(requests.some((url) => url.searchParams.get('cid') === '3' && url.searchParams.get('qn') === (preference === '720p' ? '64' : '120')))
+  assert(requests.some((url) => url.searchParams.get('cid') === '3' && url.searchParams.get('qn') === (preference === '720p' ? '64' : '127')))
 }
-console.log('✓ actual extension archive: manifest/locales, title hook, preview preference and 4K/720p mux task smoke passed')
+console.log('✓ actual extension archive: manifest/locales, title hook, highest protocol schema, preview preference and 8K/720p mux task smoke passed')
